@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta id="viewport" name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1; user-scalable=no;">
+    <title>人脸搜索</title>
+    <script type="text/javascript" src="http://www.w3school.com.cn/jquery/jquery-1.11.1.min.js"></script>
+    <script type="text/javascript" src="{{url_for('static', filename='classes.js')}}" ></script>
+
+    <style>
+        .red{
+            color:red;
+        }
+
+        #log{
+            background:black;
+            color:white;
+            width:960px;
+        }
+    </style>
+</head>
+
+<body>
+
+<p>
+    <input type="file" name="file" id="file" />
+</p>
+<input type="button" id="submit_button" value="入库" />
+<input type="button" id="submit_button2" value="搜索" />
+
+<p>
+    <textarea id="log" cols="20" rows="10" ></textarea>
+    <br/>
+	原始图片：
+    <canvas id="cvs" />
+</p>
+
+								
+<div class="general-waterfall">
+                        <!--图片列表-->
+</div>
+
+<script type="text/javascript">
+    origin_width = 112
+    width = origin_width
+    origin_height = 112
+    height = origin_height
+
+    $("[name='file']").change(function(e){
+
+        var file = this.files[0];
+
+        log_append("选择图片："+file.name)
+
+        var reader = new FileReader();
+        reader.readAsDataURL(file);//转化成base64数据类型
+        reader.onload = function(e){
+                drawToCanvas(this.result);
+            }
+
+    });
+
+
+    $("#submit_button").click(function(){
+        post_api("/storage")
+
+    });
+
+    $("#submit_button2").click(function(){
+        post_api("/search")
+
+    });
+
+
+    
+
+    function post_api(url){
+        file = $("#file").val()
+        if(!file){
+            log("请选择图片!!!")
+            return;
+        }
+
+        var data = new FormData();
+        data.append("file", $("#file").get(0).files[0]);
+        data.append("id_card_side", "front")
+        // data.append("id_card_side", "back")
+        $.ajax({
+            type:'post',
+            url:url,
+            cache: false,    //上传文件不需缓存
+            processData: false, //需设置为false。因为data值是FormData对象，不需要对数据做处理
+            contentType: false, //需设置为false。因为是FormData对象，且已经声明了属性enctype="multipart/form-data"
+            data:data,
+            dataType:'json',
+            success:function(data){
+                console.log(data)
+                log_append("服务器处理成功!")
+				
+				var images  = data['sim_image'];
+				var similarity = data['sim'];
+				var htmlContent = '<div class="general-imgrow">';
+				log_append(JSON.stringify(data, null, 4))
+				for(var i=0;i<images.length;i++){
+					htmlContent = htmlContent +
+					  '<div style="float: left">' +
+					  ' <div style="margin-top: 20px"><span>相似度：' + (similarity[i]*100.0).toFixed(1) + '%</span></div>' +
+
+					  ' <div><a target="_blank" href="' + images[i] + '" class="general-imgrow-item" style="margin-right: 10px; background-color: rgba(31,55,44,0);">' +
+					  '       <span class="general-imgrow-item-bg graph-imgbg-fff"></span>' +
+					  '       <img src="' + images[i] + '" height="250.20892746530586">' +
+					  '      </a>' +
+					  ' </div>' +
+					  '</div>';
+
+					if((i+1)%6 == 0 && images.length != i){
+					  htmlContent = htmlContent + '</div>';
+					  htmlContent = htmlContent + '<div class="general-imgrow">';
+					}
+				}
+
+				$('div.general-waterfall').html(htmlContent);
+            },
+            xhr: function(){
+                var xhr = $.ajaxSettings.xhr();
+                xhr.upload.addEventListener("progress" , onprogress, false);
+                return xhr;
+            },
+            error:function(){
+                log_append("服务器处理出错!")
+            }
+        })
+    }
+
+    function onprogress(evt){
+        var loaded = evt.loaded;     //已经上传大小情况
+        var tot = evt.total;      //附件总大小
+        var per = Math.floor(100*loaded/tot);  //已经上传的百分比
+        log_append( "已经上传:"+per +"%" );
+        if(per >= 100){
+            log_append( "服务器正在识别...");
+        }
+    }
+  
+
+    function drawToCanvas(imgData){
+        var cvs = document.querySelector('#cvs');
+        var ctx = cvs.getContext('2d');
+
+
+        var img = new Image;
+        img.src = imgData;
+        img.onload = function(){
+            width = origin_width
+            height = origin_width * img.height / img.width
+
+            cvs.width=width;
+            cvs.height=height;
+
+            ctx.drawImage(img,0,0,width,height);
+            //strDataURI = cvs.toDataURL();
+
+        }
+    }
+
+
+    function log(content){
+        $("#log").html(content+'\n');
+    }
+
+    function log_append(line){
+        content = $("#log").html() + line + '\n';
+        $("#log").html(content);
+        textArea  = $("#log")
+        textArea.scrollTop(textArea[0].scrollHeight)
+		
+	function showImage(imgData){
+		  $('div.graph-thumb-img>span').css("background-image", "url("+imgData + ")");
+		}
+    }
+
+</script>
+</body>
+</html>
